@@ -1,58 +1,57 @@
 # BookOutlet.ca Book Search
 
 ## Description
-An app for searching the discount book site bookoutlet.ca for books from a GoodReads list or a user created JSON list.
+An app for searching the discount book site bookoutlet.ca for books from a Goodreads library export CSV. Matched books are saved to a CSV file with their prices.
 
 ## Usage
 Run the app from the command line:
 ```
-cd ../BookPrice
 node app.js
 ```
 
-### GoodReads list
-To be able to fetch lists from GoodReads you will need to get an API key which should be added into the `goodReadsRequestConfig` object in app.js, under the key `key`. More information on getting an API key can be found here: https://www.goodreads.com/api.
+### Goodreads CSV Export
+Export your Goodreads library at **My Books → Import and Export → Export Library**. Save the `.csv` file and note its path.
 
-You can find your GoodReads ID by navigating to one of your lists and looking for the number inbetween 'list' and your username, e.g:
- `https://www.goodreads.com/review/list/`**`94096085`**`-ben-unyolo?shelf=read`
-
-After running the script you will be asked a few questions:
+After running the script you will be asked:
 ```bash
-? Do you want to search for books from a Good Reads shelf? (Y/n)  # type 'y' for goodreads shelf
+? Path to your Goodreads library export CSV:
+# Enter the path to the exported CSV (default: ./goodreads_library_export.csv)
 
-? What is your Good Reads ID? # type goodreads ID
-
-? What shelf do you want to search? (Use arrow keys) # select whether you want to search 'Want to Read' shelf or another
-❯ Want to Read 
-  Other
-
-# if not selecting 'Want to Read' shelf
-? What is the name of the shelf? # type name of the shelf to search
+? Which bookshelf to search? (e.g. to-read, read, currently-reading)
+# Enter the exact shelf name you want to check against Book Outlet
 ```
 
-### User created JSON list
-You can also create your own list to search. Create a JSON file within the BookPrice folder in the following format:
+Results are written to `bookoutlet_results.csv` in the project folder with headers:
+`TITLE, AUTHOR, PRICE, NUM_PAGES, BOOKSHELF`
 
-```json
-[
-  {
-    "title": "Nineteen–Eighty Four",
-    "author": "George Orwell"
-  },
-  {
-    "title": "To Kill a Mockingbird",
-    "author": "Harper Lee"
-  },
-  {
-    "title": "Pride and Prejudice",
-    "author": "Jane Austen"
-  }
-]
-```
+---
 
-After running the script you will be asked a few questions:
-```bash
-? Do you want to search for books from a Good Reads shelf? (Y/n)  # type 'n' for JSON list
+## Deprecated / No Longer Relevant
 
-What is the name of the JSON file with books? # type the name of the file without .json extension
-```
+~~### GoodReads API~~
+
+~~To be able to fetch lists from GoodReads you will need to get an API key which should be added into the `goodReadsRequestConfig` object in app.js, under the key `key`. More information on getting an API key can be found here: https://www.goodreads.com/api.~~
+
+~~You can find your GoodReads ID by navigating to one of your lists and looking for the number inbetween 'list' and your username, e.g:~~
+~~`https://www.goodreads.com/review/list/`**`94096085`**`-ben-unyolo?shelf=read`~~
+
+~~After running the script you will be asked a few questions:~~
+
+~~`? Do you want to search for books from a Good Reads shelf? (Y/n)` — type 'y' for goodreads shelf~~
+
+~~`? What is your Good Reads ID?` — type goodreads ID~~
+
+~~`? What shelf do you want to search?` — select 'Want to Read' or 'Other'~~
+
+~~`? What is the name of the shelf?` — if not selecting 'Want to Read'~~
+
+~~### User Created JSON List~~
+
+~~You can also create your own list to search. Create a JSON file within the BookPrice folder in the following format:~~
+
+~~`? Do you want to search for books from a Good Reads shelf? (Y/n)` — type 'n' for JSON list~~
+
+~~`? What is the name of the JSON file with books?` — type the filename without `.json` extension~~
+
+~~JSON format example:~~
+~~`[{ "title": "Nineteen–Eighty Four", "author": "George Orwell" }, ...]`~~
