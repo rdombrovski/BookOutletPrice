@@ -9,9 +9,9 @@
   "author": "Ben Unyolo",
   "license": "ISC",
   "dependencies": {
-    "axios": "^0.19.2",
-    "cheerio": "^1.0.0-rc.3",
+    "axios": "^1.16.1",
+    "cheerio": "^1.2.0",
     "csv-parse": "^6.2.1",
-    "inquirer": "^7.2.0"
+    "inquirer": "^8.2.7"
   }
 }
