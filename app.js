@@ -1,13 +1,23 @@
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const cheerio = require('cheerio');
 const inquirer = require('inquirer');
 const { parse } = require('csv-parse/sync');
 
 let bookLonglist = [];
 let finalArray = [];
-const bookOutletDelay = 500;
+
+// Constructor.io is Book Outlet's search backend — public client key embedded in their JS
+const CIO_KEY = 'key_udjk7sSacp6D0sVq';
+const CIO_QS = JSON.stringify({
+  pre_filter_expression: {
+    and: [
+      { name: 'restricted_ca', value: false },
+      { name: 'quantity', range: [1, 'inf'] }
+    ]
+  }
+});
+const CIO_DELAY = 300;
 
 const questions = [
   {
@@ -47,6 +57,7 @@ const loadGoodreadsCSV = (csvPath, shelf) => {
     .map(row => ({
       title: row['Title'],
       author: row['Author'],
+      authorLF: row['Author l-f'],   // "Last, First" — matches Constructor.io's author_1 field
       numPages: row['Number of Pages'] || '',
       shelf: (row['Exclusive Shelf'] || shelf).trim()
     }));
@@ -58,10 +69,9 @@ const compareLists = async () => {
 
     for (const [index, selectedBook] of bookLonglist.entries()) {
       console.log(`Searching ${index + 1} of ${totalBooks}: ${selectedBook.title}`);
-      const matchedBooks = await searchBookOutlet(selectedBook);
-      if (matchedBooks && matchedBooks.length > 0) {
-        finalArray.push(...matchedBooks);
-      }
+      const match = await searchBookOutlet(selectedBook);
+      if (match) finalArray.push(match);
+      await delay(CIO_DELAY);
     }
 
     console.log(`\nFound ${finalArray.length} book(s) available at Book Outlet.\n`);
@@ -73,66 +83,49 @@ const compareLists = async () => {
 };
 
 const searchBookOutlet = async (selectedBook) => {
-  const bookURI = encodeURIComponent(selectedBook.title).replace(/%20/g, '+');
-  const authorURI = encodeURIComponent(selectedBook.author).replace(/%20/g, '+');
+  try {
+    const resp = await axios.get(
+      `https://ac.cnstrc.com/search/${encodeURIComponent(selectedBook.title)}`,
+      {
+        params: { key: CIO_KEY, qs: CIO_QS, num_results_per_page: 30, c: 'ciojs-client-2.x' }
+      }
+    );
 
-  const titleArray = await fetchBookOutletSearch(bookURI, 'Title');
-  await delay(bookOutletDelay);
+    const results = resp.data.response?.results || [];
+    const authorLF = (selectedBook.authorLF || '').toLowerCase().trim();
 
-  if (titleArray.length === 0) return null;
+    // filter to results that match this exact book (title + author)
+    const matches = results.filter(r => {
+      const apiTitle = r.value.toLowerCase().trim();
+      const csvTitle = selectedBook.title.toLowerCase().trim();
+      // allow series notation: "Book Title (Series, #1)" matches "Book Title"
+      const titleMatch = apiTitle === csvTitle || csvTitle.startsWith(apiTitle);
+      const authorMatch = (r.data.author_1 || '').toLowerCase().trim() === authorLF;
+      return titleMatch && authorMatch;
+    });
 
-  const authorArray = await fetchBookOutletSearch(authorURI, 'Author');
-  await delay(bookOutletDelay);
+    if (matches.length === 0) return null;
 
-  return titleArray
-    .filter(titleBook =>
-      authorArray.some(authorBook =>
-        titleBook.title === authorBook.title && titleBook.author === authorBook.author
-      )
-    )
-    .map(book => ({
-      ...book,
+    // pick the cheapest in-stock edition
+    const cheapest = matches.reduce((best, r) => {
+      const price = r.data.sale_price_cad ?? r.data.regular_price_cad ?? Infinity;
+      const bestPrice = best.data.sale_price_cad ?? best.data.regular_price_cad ?? Infinity;
+      return price < bestPrice ? r : best;
+    });
+
+    const price = cheapest.data.sale_price_cad ?? cheapest.data.regular_price_cad;
+
+    return {
+      title: selectedBook.title,
+      author: selectedBook.author,
+      price,
       numPages: selectedBook.numPages,
       shelf: selectedBook.shelf
-    }));
-};
-
-const fetchBookOutletSearch = async (term, category) => {
-  try {
-    const response = await axios.get(
-      `https://bookoutlet.ca/Store/Browse?q=${term}&qf=${category}&size=24&sort=relevance_1&view=list`
-    );
-    return processBookOutletResponse(response);
+    };
   } catch (error) {
-    console.log(`ERROR AT: ${fetchBookOutletSearch.name} — ${error.message}`);
-    return [];
+    console.log(`  ERROR searching "${selectedBook.title}": ${error.message}`);
+    return null;
   }
-};
-
-const processBookOutletResponse = (response) => {
-  const $ = cheerio.load(response.data);
-  const info = $('div[itemtype="http://schema.org/Book"] > .col-9');
-  const bookArray = [];
-
-  info.find('a:first-child').each((i, el) => {
-    bookArray.push({
-      title: $(el).text(),
-      author: '',
-      price: '',
-      url: `https://bookoutlet.ca${$(el).attr('href')}`
-    });
-  });
-
-  info.children('p:first-child').each((i, el) => {
-    let item = $(el).children().remove().end().text().trim();
-    bookArray[i].author = item.split(', ').reverse().join(' ');
-  });
-
-  info.find('h6 > span:nth-child(2)').each((i, el) => {
-    bookArray[i].price = $(el).text().replace(/[^0-9.]+/g, '');
-  });
-
-  return bookArray;
 };
 
 const writeCSV = (books) => {
